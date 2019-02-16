@@ -18,7 +18,7 @@
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
-bool state = false;                    // state is true if the rover has been activated and is driving.
+bool state = false;                    // state is true if the rover has been activated and is driving. // change to isdriving
 
 void setup()
 {
@@ -55,7 +55,7 @@ void loop()
   while (Serial.available()) {
 
     char c = Serial.read();       // Read input from serial (ground computer)
-                                
+
     if (c == 'T') {
 
       Serial.println("Sending test packet to rover");
@@ -139,12 +139,12 @@ void loop()
           Serial.print("Got reply: ");
           Serial.println((char*)haltBuffer);
           Serial.print("RSSI: ");
-          Serial.println(rf95.lastRssi(), DEC);                     
+          Serial.println(rf95.lastRssi(), DEC);
         }
         else
         {
           Serial.println("Failed to read reply.");    // This means a signal was received but could not be read.
-        }                                                                       
+        }
       }
       else
       {
@@ -159,9 +159,9 @@ void loop()
   if (state) {                                             // if rover has been activated
     if(rf95.available()){
       uint8_t endBuffer[RH_RF95_MAX_MESSAGE_LEN];          // Buffer to store end-of-mission message received from rover.
-      uint8_t endBufferLen = sizeof(endBuffer);
+      uint8_t c = sizeof(endBuffer);
 
-      if (rf95.recv(endBuffer, &endBufferLen))             // Keep scanning the receiver for any message received.
+      if (rf95.recv(endBuffer, RH_RF95_MAX_MESSAGE_LEN))             // Keep scanning the receiver for any message received.
       {
         Serial.println("Received message from rover:");
         Serial.println((char*)endBuffer);

@@ -3,7 +3,7 @@
 #include <SPI.h>
 #include <RH_RF95.h>           // For Transceiver
 #include <Wire.h>              // For accelerometer/gyro
-#include <ServoTimer2.h>       // For servo control. The regular servo library disables PWM on pins 9 and 10. 
+#include <ServoTimer2.h>       // For servo control. The regular servo library disables PWM on pins 9 and 10.
 // This one uses a different timer register that doesn't interfere with those pins.
 // *** Pin definitions and constants for RF95 radio ***
 #define RFM95_CS 4
@@ -24,7 +24,7 @@ const int MPU = 0x68;
 int Orientation;
 
 // *** Encoder for distance measurement ***
-#define ENCODER_PIN  3                       // interrupt pin  
+#define ENCODER_PIN  3                       // interrupt pin
 unsigned long ticks = 0;
 
 // *** Initialize three instances of servos ***
@@ -102,11 +102,11 @@ void setup()
 }
 
 void loop() {
-        
+
   int servoMillis = 0;                     // this is a counter that will be used to move the sensor servo based on the millis function. It is reset to zero after every cycle.
   long lastServoMillis = 0;
   int servoAngle = 0;
-      
+
   if (readState()) {                   //  returns true if wakeup message is received
     while (ticks < 100000) {           // Change this number to the actual number of ticks that represents 10+ feet. This is the driving mode. After exiting this loop the rover begins to dig.
 
@@ -161,6 +161,7 @@ void loop() {
         obs2[3] = obstacleCheck(servoMillis);
       }
 
+      // ex. obs[0] = obs1[0] && obs2[3]; // -Patrick -> do this pls
       if (obs1[0] && obs2[3]) obs[0] = 1;      // Obstacles only register as true if they show up in both clockwise and counterclockwise scans
       else obs[0] = 0;
       if (obs1[1] && obs2[2]) obs[1] = 1;
@@ -175,48 +176,48 @@ void loop() {
       if (!(obs[0] | obs[1] | obs[2] | obs[3])) {          // if there are no obstacles
         driveStraight();
       }
-      else if (obs[0] = 1 && !(obs[1] | obs[2] | obs[3])) {
+      else if (obs[0] && !(obs[1] | obs[2] | obs[3])) {
         slightRight();
       }
-      else if (obs[1] = 1 && !(obs[2] | obs[3])) {
-      turnRight();
+      else if (obs[1]  && !(obs[2] | obs[3])) { // TABS!!1! -Patrick
+        turnRight();
       }
-      else if (obs[3] = 1 && !(obs[0] | obs[1] | obs[2])) {
-      slightLeft();
+      else if (obs[3]  && !(obs[0] | obs[1] | obs[2])) {
+        slightLeft();
       }
-      else if (obs[2] = 1 && !(obs[0] | obs[1])) {
-      turnLeft();
+      else if (obs[2] && !(obs[0] | obs[1])) { // 2 equal signs ! - Patrick
+        turnLeft();
       }
       else if ((obs [1] && obs[2]) && !(obs[0] | obs[3])) {
-      turnRight();
+        turnRight();
       }
       else if ((obs[0] && obs[1] && obs[2]) && !obs[3]) {
-      turnRight();
+        turnRight();
       }
       else if ((obs[1] && obs[2] && obs[3]) && !obs[0]) {
-      turnLeft();
+        turnLeft();
       }
       else if (obs[0] && obs[3]) {
-      sharpLeft();
+        sharpLeft();
       }
       else if (obs[0]) {
-      slightRight();
+        slightRight();
       }
       else if (obs[3]) {
-      slightLeft();
+        slightLeft();
       }
       else if (obs[1]) {
-      turnRight();
+        turnRight();
       }
       else if (obs[2]) {
-      turnLeft();
+        turnLeft();
       }
       // once the counter reaches the equivalent of around 15 ft, the code exits out of this while loop.
     }
     // time to collect soil
 
     Orientation = getOrientation();
-    if (Orientation <= -5) {
+    if (Orientation <= -5) { //probably could just use getOrientation() here - Matt
       flip();
     }
     for (int i = 0; i < 5; i++) {
@@ -265,7 +266,7 @@ int getOrientation() {
   GyY = Wire.read() << 8 | Wire.read();
   GyZ = Wire.read() << 8 | Wire.read();
 
-  x = AcX / 1752;
+  x = AcX / 1752;  //
   y = AcY / 1752;
   z = AcZ / 1752;
 
@@ -280,7 +281,7 @@ void countTicks() {        // Interrupt service routine for the encoder to measu
   ticks++;                 // literally just counts ticks.
 }
 
-bool readState() {
+bool readState() {  //rename to handleState
   if (rf95.available())
   {
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
