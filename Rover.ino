@@ -14,14 +14,13 @@
 // *** Ultrasonic sensor stuff ***
 #define TRIG_PIN  20
 #define ECHO_PIN  21
-int obs1[4];      // The rover uses the distance of obscales on each sector to decide which way to turn
-int obs2[4];      // These become 1 if there is an obstacle
-int obs[4];
+int Clockwise[4];      // The rover uses the distance of obstacles on each sector to decide which way to turn
+int counterClockwise[4];      // These become 1 if there is an obstacle
+int obstaclePresent[4];
 int servoAngle;                  // The current servo angle when the distance was measured
 
-// *** Variables for accelerometer ***
+// *** Accelerometer I2C address ***
 const int MPU = 0x68;
-int Orientation;
 
 // *** Encoder for distance measurement ***
 #define ENCODER_PIN  3                       // interrupt pin
@@ -37,16 +36,19 @@ ServoTimer2 sensorServo;
 
 // *** Variables for the motor driver ***
 
-#define A1 10     // Control pins for the right motor (PWM)
-#define A2 9
-#define B1 5      // Control pins for the left motor (PWM)
-#define B2 6
+#define leftForward 10     // Control pins for the left motor (PWM)
+#define leftReverse 9
+#define rightForward 5      // Control pins for the right motor (PWM)
+#define rightReverse 6
 int drivingSpeed = 170;
 int reverseSpeed = 100;
+int slightTurnSpeed = 90;
+int turnSpeed = 45;
+int sharpTurnSpeed = 0;
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);  // initialize rf95 class
 
-bool state = false; // state is true when the rover is in active (driving or collecting soil) mode
+bool isActive = false;          // isActive is true when the rover is in active (driving or collecting soil) mode
 
 void setup()
 {
@@ -87,14 +89,14 @@ void setup()
   sensorServo.attach(SERVO_SENSOR);
 
   hookServo1.write(600);                   // initial stowed position of arm
-  hookServo2.write(2400);
+  hookServo2.write(2400);               
   sensorServo.write(1500);                 // start with the servo in the neutral position
 
   // *** DC motor controller pins ***
-  pinMode(A1, OUTPUT);
-  pinMode(A2, OUTPUT);
-  pinMode(B1, OUTPUT);
-  pinMode(B2, OUTPUT);
+  pinMode(leftForward, OUTPUT);
+  pinMode(leftReverse, OUTPUT);
+  pinMode(rightForward, OUTPUT);
+  pinMode(rightReverse, OUTPUT);
 
   // *** Ultrasonic sensor setup ***
   pinMode(TRIG_PIN, OUTPUT);
@@ -106,16 +108,16 @@ void loop() {
   int servoMillis = 0;                     // this is a counter that will be used to move the sensor servo based on the millis function. It is reset to zero after every cycle.
   long lastServoMillis = 0;
   int servoAngle = 0;
+  int totalDistance = 10000;               // total distance that the rover needs to travel. increases each time the rover turns
 
-  if (readState()) {                   //  returns true if wakeup message is received
-    while (ticks < 100000) {           // Change this number to the actual number of ticks that represents 10+ feet. This is the driving mode. After exiting this loop the rover begins to dig.
+  if (handleState()) {                     //  returns true if wakeup message is received. Also handles test signal and sends reply to ground control
+    while (ticks < totalDistance) {        // Change this number to the actual number of ticks that represents 10+ feet. This is the driving mode. After exiting this loop the rover begins to dig.
 
       long currentMillis = millis();
       int previousMillis = 0;
       if (currentMillis - previousMillis >= 10000) {      // Check orientation every 10 seconds and flip if needed
-        Orientation = getOrientation();
         previousMillis = currentMillis;
-        if (Orientation <= -5) {
+        if (getOrientation <= -5) {
           flip();
         }
       }
@@ -134,90 +136,96 @@ void loop() {
       }
       else if (servoMillis > 500 && servoMillis <= 1000) {
         servoAngle = map(servoMillis, 500, 1000, 1800, 1200);
-        sensorServo.write(servoAngle);                 // scans right to left
+        sensorServo.write(servoAngle);                          // scans right to left
       }
       if (servoMillis == 60) {
-        obs1[0] = obstacleCheck(servoMillis);           // arrays obs1 and obs2 store distance information. 1 if obstacle exists at that angle and 0 if no obstacle exists
+        Clockwise[0] = obstacleCheck(servoMillis);           // arrays Clockwise and counterClockwise store distance information. 1 if obstacle exists at that angle and 0 if no obstacle exists
       }
       else if (servoMillis == 187) {
-        obs1[1] = obstacleCheck(servoMillis);
+        Clockwise[1] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 314) {
-        obs1[2] = obstacleCheck(servoMillis);
+        Clockwise[2] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 441) {
-        obs1[3] = obstacleCheck(servoMillis);
+        Clockwise[3] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 559) {
-        obs2[0] = obstacleCheck(servoMillis);
+        counterClockwise[0] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 686) {
-        obs2[1] = obstacleCheck(servoMillis);
+        counterClockwise[1] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 813) {
-        obs2[2] = obstacleCheck(servoMillis);
+        counterClockwise[2] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 940) {
-        obs2[3] = obstacleCheck(servoMillis);
+        counterClockwise[3] = obstacleCheck(servoMillis);
       }
 
-      // ex. obs[0] = obs1[0] && obs2[3]; // -Patrick -> do this pls
-      if (obs1[0] && obs2[3]) obs[0] = 1;      // Obstacles only register as true if they show up in both clockwise and counterclockwise scans
-      else obs[0] = 0;
-      if (obs1[1] && obs2[2]) obs[1] = 1;
-      else obs[1] = 0;
-      if (obs1[2] && obs2[1]) obs[2] = 1;
-      else obs[2] = 0;
-      if (obs1[3] && obs2[0]) obs[3] = 1;
-      else obs[3] = 0;
+      if (Clockwise[0] && counterClockwise[3]) 
+        obstaclePresent[0] = 1;      // Obstacles only register as true if they show up in both clockwise and counterclockwise scans
+      else 
+        obstaclePresent[0] = 0;
+      if (Clockwise[1] && counterClockwise[2]) 
+        obstaclePresent[1] = 1;
+      else 
+        obstaclePresent[1] = 0;
+      if (Clockwise[2] && counterClockwise[1]) 
+        obstaclePresent[2] = 1;
+      else 
+        obstaclePresent[2] = 0;
+      if (Clockwise[3] && counterClockwise[0]) 
+        obstaclePresent[3] = 1;
+      else 
+        obstaclePresent[3] = 0;
 
       // Use the above information to decide how to drive
 
-      if (!(obs[0] | obs[1] | obs[2] | obs[3])) {          // if there are no obstacles
+      if (!(obstaclePresent[0] | obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {          // if there are no obstaclePresenttacles
         driveStraight();
       }
-      else if (obs[0] && !(obs[1] | obs[2] | obs[3])) {
+      else if (obstaclePresent[0] && (obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {
         slightRight();
       }
-      else if (obs[1]  && !(obs[2] | obs[3])) { // TABS!!1! -Patrick
+      else if (obstaclePresent[1] == 1 && !(obstaclePresent[2] | obstaclePresent[3])) {
         turnRight();
       }
-      else if (obs[3]  && !(obs[0] | obs[1] | obs[2])) {
+      else if (obstaclePresent[3] == 1 && !(obstaclePresent[0] | obstaclePresent[1] | obstaclePresent[2])) {
         slightLeft();
       }
-      else if (obs[2] && !(obs[0] | obs[1])) { // 2 equal signs ! - Patrick
+      else if (obstaclePresent[2] == 1 && !(obstaclePresent[0] | obstaclePresent[1])) {
         turnLeft();
       }
-      else if ((obs [1] && obs[2]) && !(obs[0] | obs[3])) {
+      else if ((obstaclePresent [1] && obstaclePresent[2]) && !(obstaclePresent[0] | obstaclePresent[3])) {
+       turnRight();
+      }
+      else if ((obstaclePresent[0] && obstaclePresent[1] && obstaclePresent[2]) && !obstaclePresent[3]) {
         turnRight();
       }
-      else if ((obs[0] && obs[1] && obs[2]) && !obs[3]) {
-        turnRight();
-      }
-      else if ((obs[1] && obs[2] && obs[3]) && !obs[0]) {
+      else if ((obstaclePresent[1] && obstaclePresent[2] && obstaclePresent[3]) && !obstaclePresent[0]) {
         turnLeft();
       }
-      else if (obs[0] && obs[3]) {
+      else if (obstaclePresent[0] && obstaclePresent[3]) {
         sharpLeft();
       }
-      else if (obs[0]) {
+      else if (obstaclePresent[0]) {
         slightRight();
       }
-      else if (obs[3]) {
+      else if (obstaclePresent[3]) {
         slightLeft();
       }
-      else if (obs[1]) {
+      else if (obstaclePresent[1]) {
         turnRight();
       }
-      else if (obs[2]) {
+      else if (obstaclePresent[2]) {
         turnLeft();
       }
-      // once the counter reaches the equivalent of around 15 ft, the code exits out of this while loop.
+      // once the counter reaches the equivalent of the total distance required to drive, the code exits out of this while loop.
     }
     // time to collect soil
 
-    Orientation = getOrientation();
-    if (Orientation <= -5) { //probably could just use getOrientation() here - Matt
+    if (getOrientation() <= -5) { 
       flip();
     }
     for (int i = 0; i < 5; i++) {
@@ -235,7 +243,7 @@ void loop() {
       retractArm();
     }
     delay(1000);
-    state = false;
+    isActive = false;
 
     while (1) {                // infinite loop where it just sends the end-of-mission signal to ground control every second
       uint8_t done[] = "Done digging! Come get me";
@@ -245,14 +253,14 @@ void loop() {
     }
   }
   else {
-    Serial.println("Rover in standby");
+    Serial.println("Rover on standby");
   }
 }
+
 int getOrientation() {
 
   int16_t AcX, AcY, AcZ, Tmp, GyX, GyY, GyZ;
-  int Acc[3];
-  int x, y, z;
+  int z;                       //  only reads the acceleration in the z (vertical) direction. Enough to tell orientation
 
   Wire.beginTransmission(MPU);
   Wire.write(0x3B);
@@ -266,13 +274,7 @@ int getOrientation() {
   GyY = Wire.read() << 8 | Wire.read();
   GyZ = Wire.read() << 8 | Wire.read();
 
-  x = AcX / 1752;  //
-  y = AcY / 1752;
-  z = AcZ / 1752;
-
-  Acc[0] = x;
-  Acc[1] = y;
-  Acc[2] = z;
+  z = AcZ / 1752;           // Dividing the raw value by this number gives the acceleration in m/s2
 
   return z;
 }
@@ -281,7 +283,7 @@ void countTicks() {        // Interrupt service routine for the encoder to measu
   ticks++;                 // literally just counts ticks.
 }
 
-bool readState() {  //rename to handleState
+bool handleState() {  
   if (rf95.available())
   {
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
@@ -295,53 +297,53 @@ bool readState() {  //rename to handleState
       Serial.println(rf95.lastRssi(), DEC);
       delay(10);
       if ((char*)buf[0] == 'W') {        // wakeup signal reads "Wake up Wall E!"
-        state = true;
+        isActive = true;
         uint8_t data[] = "Wakeup command received";
         rf95.send(data, sizeof(data));
         rf95.waitPacketSent();
         Serial.println("Sent a reply");
-        Orientation = getOrientation();   // check orientation immediately after being activated
-        if (Orientation <= -5) {
+        if (getOrientation() <= -5) {        // check orientation immediately after being activated
           flip();
         }
       }
       else if ((char*)buf[0] == 'T') {   // test signal reads "Testing connection"
-        state = false;
+        isActive = false;
         uint8_t data[] = "Connection test successful";
         rf95.send(data, sizeof(data));
         rf95.waitPacketSent();
         Serial.println("Sent a reply");
       }
       else if ((char*)buf[0] == 'S') {           // Halt command reads "Stop driving"
-        state = false;
+        isActive = false;
         uint8_t data[] = "Rover in standby";
         rf95.send(data, sizeof(data));
         rf95.waitPacketSent();
         Serial.println("Sent a reply");
       }
       else{
-        state = false;
+        isActive = false;
       }
     }
   }
-  return state;
+  return isActive;
 }
+
 void deployArm() {
   hookServo1.write(2400);
   hookServo2.write(600);
 }
+
 void retractArm() {
   hookServo1.write(600);
   hookServo2.write(2400);
 }
+
 void flip() {
   hookServo1.write(2400);
   hookServo2.write(600);
   delay(1000);
-
   hookServo1.write(600);
   hookServo2.write(2400);
-
   delay(1000);
 }
 
@@ -354,8 +356,8 @@ int obstacleCheck(int angle) {
     delayMicroseconds(10);
     digitalWrite(TRIG_PIN, LOW);
 
-    long duration = pulseIn(ECHO_PIN, HIGH, 10000);
-    if (duration > 0) return 1;
+    long duration = pulseIn(ECHO_PIN, HIGH, 10000);      // duration in microseconds for the echo to come back. returns zero if no echo is detected
+    if (duration > 0) return 1;                    
     else return 0;
   }
   else {
@@ -373,30 +375,44 @@ int obstacleCheck(int angle) {
 }
 
 void driveStraight(){
-  analogWrite(A1, drivingSpeed);
-  analogWrite(B1, drivingSpeed);
+  analogWrite(leftForward, drivingSpeed);
+  analogWrite(rightForward, drivingSpeed);
+  analogWrite(leftReverse, 0);
+  analogWrite(rightReverse, 0);
 }
 void reverse(){
-  analogWrite(A2, reverseSpeed);
-  analogWrite(B2, reverseSpeed);
+  analogWrite(leftForward, 0);
+  analogWrite(rightForward, 0);
+  analogWrite(leftReverse, reverseSpeed);
+  analogWrite(rightReverse, reverseSpeed);
 }
 void slightLeft(){
-  analogWrite(A1, 100);
-  analogWrite(B1, 170);
+  analogWrite(leftForward, slightTurnSpeed);
+  analogWrite(rightForward, drivingSpeed);
+  analogWrite(leftReverse, 0);
+  analogWrite(rightReverse, 0);
 }
 void slightRight(){
-  analogWrite(A1, 170);
-  analogWrite(B1, 100);
+  analogWrite(leftForward, drivingSpeed);
+  analogWrite(rightForward, slightTurnSpeed);
+  analogWrite(leftReverse, 0);
+  analogWrite(rightReverse, 0);
 }
 void turnLeft(){
-  analogWrite(A1, 50);
-  analogWrite(B1, 170);
+  analogWrite(leftForward, turnSpeed);
+  analogWrite(rightForward, drivingSpeed);
+  analogWrite(leftReverse, 0);
+  analogWrite(rightReverse, 0);
 }
 void turnRight(){
-  analogWrite(A1, 170);
-  analogWrite(B1, 50);
+  analogWrite(leftForward, drivingSpeed);
+  analogWrite(rightForward, turnSpeed);
+  analogWrite(leftReverse, 0);
+  analogWrite(rightReverse, 0);
 }
 void sharpLeft(){
-  analogWrite(A1, 0);
-  analogWrite(B1, 170);
+  analogWrite(leftForward, sharpTurnSpeed);
+  analogWrite(rightForward, drivingSpeed);
+  analogWrite(leftReverse, 0);
+  analogWrite(rightReverse, 0);
 }
