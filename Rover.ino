@@ -247,7 +247,8 @@ void loop() {
 
     while (1) {                // infinite loop where it just sends the end-of-mission signal to ground control every second
       uint8_t done[] = "Done digging! Come get me";
-      rf95.send(done, sizeof(done));
+      uint8_t len = sizeof(done);
+      rf95.send(done, &len);
       rf95.waitPacketSent();
       delay(1000);
     }
@@ -299,7 +300,8 @@ bool handleState() {
       if ((char*)buf[0] == 'W') {        // wakeup signal reads "Wake up Wall E!"
         isActive = true;
         uint8_t data[] = "Wakeup command received";
-        rf95.send(data, sizeof(data));
+        uint8_t len = sizeof(data);
+        rf95.send(data, &len);
         rf95.waitPacketSent();
         Serial.println("Sent a reply");
         if (getOrientation() <= -5) {        // check orientation immediately after being activated
@@ -309,14 +311,16 @@ bool handleState() {
       else if ((char*)buf[0] == 'T') {       // test signal reads "Testing connection"
         isActive = false;
         uint8_t data[] = "Connection test successful";
-        rf95.send(data, sizeof(data));
+        uint8_t len = sizeof(data);
+        rf95.send(data, &len);
         rf95.waitPacketSent();
         Serial.println("Sent a reply");
       }
       else if ((char*)buf[0] == 'S') {           // Halt command reads "Stop driving"
         isActive = false;
         uint8_t data[] = "Rover in standby";
-        rf95.send(data, sizeof(data));
+        uint8_t len = sizeof(data);
+        rf95.send(data, &len);
         rf95.waitPacketSent();
         Serial.println("Sent a reply");
       }
