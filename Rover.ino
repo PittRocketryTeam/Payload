@@ -14,10 +14,10 @@
 // *** Ultrasonic sensor stuff ***
 #define TRIG_PIN  20
 #define ECHO_PIN  21
-int Clockwise[4];      // The rover uses the distance of obstacles on each sector to decide which way to turn
+int Clockwise[4];             // Arrays to store whether or not there are obstacles in the four angular positions at which measurements are taken during each sweep
 int counterClockwise[4];      // These become 1 if there is an obstacle
-int obstaclePresent[4];
-int servoAngle;                  // The current servo angle when the distance was measured
+int obstaclePresent[4];       // Obstacles are registered if they show up in both clockwise and counterclockwise sweeps in the same position
+int servoAngle;               // The servo angle when the distance was measured. This is used to determine the timeout that sets the maximum distance of obstacles
 
 // *** Accelerometer I2C address ***
 const int MPU = 0x68;
@@ -31,22 +31,22 @@ unsigned long ticks = 0;
 #define HOOK2 17
 #define SERVO_SENSOR 7
 ServoTimer2 hookServo1;
-ServoTimer2 hookServo2;          // create three instances of servos
+ServoTimer2 hookServo2;     
 ServoTimer2 sensorServo;
 
 // *** Variables for the motor driver ***
 
-#define leftForward 10     // Control pins for the left motor (PWM)
+#define leftForward 10      // Control pins for the left motor (PWM)
 #define leftReverse 9
 #define rightForward 5      // Control pins for the right motor (PWM)
 #define rightReverse 6
 int drivingSpeed = 170;
 int reverseSpeed = 100;
-int slightTurnSpeed = 90;
+int slightTurnSpeed = 90; 
 int turnSpeed = 45;
 int sharpTurnSpeed = 0;
 
-RH_RF95 rf95(RFM95_CS, RFM95_INT);  // initialize rf95 class
+RH_RF95 rf95(RFM95_CS, RFM95_INT);  
 
 bool isActive = false;          // isActive is true when the rover is in active (driving or collecting soil) mode
 
@@ -112,7 +112,7 @@ void loop() {
 
   if (handleState()) {                     //  returns true if wakeup message is received. Also handles test signal and sends reply to ground control
     while (ticks < totalDistance) {        // Change this number to the actual number of ticks that represents 10+ feet. This is the driving mode. After exiting this loop the rover begins to dig.
-
+                                           // All driving activity takes places within this while loop
       long currentMillis = millis();
       int previousMillis = 0;
       if (currentMillis - previousMillis >= 10000) {      // Check orientation every 10 seconds and flip if needed
@@ -128,10 +128,10 @@ void loop() {
       servoMillis = millis() - lastServoMillis;            // servoMillis goes from 0 to 1000 and rolls back to 0 every second.
       if (servoMillis >= 1000) {                           // the value of servoMillis is mapped to the servo angle to make it scan
         servoMillis = 0;                                   // 0 to 500 is clockwise and 500 to 1000 is counterclockwise
-        lastServoMillis = millis();
+        lastServoMillis = millis();                        
       }
       if (servoMillis > 0 && servoMillis <= 500) {
-        servoAngle = map(servoMillis, 0, 500, 1200, 1800);          // 1200 to 1800 microseconds are the pulse widths for the scanning angle. This scans left to right.
+        servoAngle = map(servoMillis, 0, 500, 1200, 1800);  // 1200 to 1800 microseconds are the pulse widths for the scanning angle. This scans left to right.
         sensorServo.write(servoAngle);
       }
       else if (servoMillis > 500 && servoMillis <= 1000) {
@@ -142,19 +142,19 @@ void loop() {
         Clockwise[0] = obstacleCheck(servoMillis);           // arrays Clockwise and counterClockwise store distance information. 1 if obstacle exists at that angle and 0 if no obstacle exists
       }
       else if (servoMillis == 187) {
-        Clockwise[1] = obstacleCheck(servoMillis);
-      }
+        Clockwise[1] = obstacleCheck(servoMillis);          // these values of the servoMillis variable correspond to specific angles at which we want to take distance measurements to detect obstacles
+      } 
       else if (servoMillis == 314) {
-        Clockwise[2] = obstacleCheck(servoMillis);
+        Clockwise[2] = obstacleCheck(servoMillis);         
       }
       else if (servoMillis == 441) {
         Clockwise[3] = obstacleCheck(servoMillis);
       }
       else if (servoMillis == 559) {
-        counterClockwise[0] = obstacleCheck(servoMillis);
+        counterClockwise[0] = obstacleCheck(servoMillis);   
       }
       else if (servoMillis == 686) {
-        counterClockwise[1] = obstacleCheck(servoMillis);
+        counterClockwise[1] = obstacleCheck(servoMillis);     
       }
       else if (servoMillis == 813) {
         counterClockwise[2] = obstacleCheck(servoMillis);
@@ -182,10 +182,10 @@ void loop() {
 
       // Use the above information to decide how to drive
 
-      if (!(obstaclePresent[0] | obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {          // if there are no obstaclePresenttacles
+      if (!(obstaclePresent[0] | obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {          // if there are no obstacles
         driveStraight();
-      }
-      else if (obstaclePresent[0] && (obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {
+      }                         // there is no default "drive straight" mode. The rover only drives straight if this specific condition is met
+      else if (obstaclePresent[0] && (obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {      // these cover most of the possible combinations of obstacles
         slightRight();
       }
       else if (obstaclePresent[1] == 1 && !(obstaclePresent[2] | obstaclePresent[3])) {
@@ -209,7 +209,7 @@ void loop() {
       else if (obstaclePresent[0] && obstaclePresent[3]) {
         sharpLeft();
       }
-      else if (obstaclePresent[0]) {
+      else if (obstaclePresent[0]) {         // if any combinations are missed, at least one of these will trigger during each loop and the rover will take appropriate action
         slightRight();
       }
       else if (obstaclePresent[3]) {
@@ -280,7 +280,7 @@ int getOrientation() {
 }
 
 void countTicks() {        // Interrupt service routine for the encoder to measure distance travelled
-  ticks++;                 // literally just counts ticks.
+  ticks++;                 // increments ticks
 }
 
 bool handleState() {  
@@ -306,7 +306,7 @@ bool handleState() {
           flip();
         }
       }
-      else if ((char*)buf[0] == 'T') {   // test signal reads "Testing connection"
+      else if ((char*)buf[0] == 'T') {       // test signal reads "Testing connection"
         isActive = false;
         uint8_t data[] = "Connection test successful";
         rf95.send(data, sizeof(data));
@@ -397,6 +397,7 @@ void slightRight(){
   analogWrite(rightForward, slightTurnSpeed);
   analogWrite(leftReverse, 0);
   analogWrite(rightReverse, 0);
+  
 }
 void turnLeft(){
   analogWrite(leftForward, turnSpeed);
