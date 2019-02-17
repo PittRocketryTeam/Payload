@@ -138,11 +138,11 @@ void loop() {
         servoAngle = map(servoMillis, 500, 1000, 1800, 1200);
         sensorServo.write(servoAngle);                          // scans right to left
       }
-      if (servoMillis == 60) {
+      if (servoMillis == 60) {                               // while the servo is turning, the ultrasonic sensor takes distance measurements at specific angles. four measurements are taken during each sweep, for eight total measurements per cycle.
         Clockwise[0] = obstacleCheck(servoMillis);           // arrays Clockwise and counterClockwise store distance information. 1 if obstacle exists at that angle and 0 if no obstacle exists
       }
       else if (servoMillis == 187) {
-        Clockwise[1] = obstacleCheck(servoMillis);          // these values of the servoMillis variable correspond to specific angles at which we want to take distance measurements to detect obstacles
+        Clockwise[1] = obstacleCheck(servoMillis);           // these values of the servoMillis variable correspond to specific angles at which we want to take distance measurements to detect obstacles
       } 
       else if (servoMillis == 314) {
         Clockwise[2] = obstacleCheck(servoMillis);         
@@ -180,7 +180,7 @@ void loop() {
       else 
         obstaclePresent[3] = 0;
 
-      // Use the above information to decide how to drive
+      // Use the above information about obstacles to decide how to drive
 
       if (!(obstaclePresent[0] | obstaclePresent[1] | obstaclePresent[2] | obstaclePresent[3])) {          // if there are no obstacles
         driveStraight();
