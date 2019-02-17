@@ -49,8 +49,11 @@ void setup()
 void loop()
 {
   char test[] = "Testing connection";
+  uint8_t testLen = sizeof(test);
   char wakeUp[] = "Wake Up Wall E!";
+  uint8_t wakeUpLen = sizeof(wakeUp);
   char halt[] = "Stop Driving";
+  uint8_t haltLen = sizeof(halt);
 
   while (Serial.available()) {
 
@@ -60,7 +63,7 @@ void loop()
 
       Serial.println("Sending test packet to rover");
       delay(10);
-      rf95.send((uint8_t *)test, sizeof(test));
+      rf95.send((uint8_t *)test, &testLen);
 
       rf95.waitPacketSent();
 
@@ -92,7 +95,7 @@ void loop()
 
       Serial.println("Sending wakeup command to rover..");
       delay(10);
-      rf95.send((uint8_t *)wakeUp, sizeof(wakeUp));
+      rf95.send((uint8_t *)wakeUp, &wakeUpLen);
 
       rf95.waitPacketSent();
 
@@ -124,7 +127,7 @@ void loop()
     else if (c == 'H'){
       Serial.println("Sending halt command to rover..");
       delay(10);
-      rf95.send((uint8_t *)halt, sizeof(halt));
+      rf95.send((uint8_t *)halt, &haltLen);
 
       rf95.waitPacketSent();
 
