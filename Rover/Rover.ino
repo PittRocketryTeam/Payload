@@ -18,7 +18,6 @@
 bool Clockwise[2];             // Arrays to store whether or not there are obstacles in the two positions at which measurements are taken during each sweep
 bool counterClockwise[2];      // These become 1 if there is an obstacle
 bool obstaclePresent[2];       // Obstacles are registered if they show up in both clockwise and counterclockwise sweeps in the same position
-int servoAngle;               
                                // This had to be simplified to only two scans per sweep as opposed to four due to what I think were RAM issues that were causing the arduino to freeze
 // *** Accelerometer I2C address ***
 const int MPU = 0x68;
