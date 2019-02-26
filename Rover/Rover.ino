@@ -38,9 +38,9 @@ ServoTimer2 sensorServo;
 
 // *** Variables for the motor driver ***
 
-#define rightForward 10      // Control pins for the left motor (PWM)
+#define rightForward 10      // Control pins for the right motor (PWM)
 #define rightReverse 9
-#define leftForward 6      // Control pins for the right motor (PWM)
+#define leftForward 6      // Control pins for the left motor (PWM)
 #define leftReverse 5
 #define drivingSpeed 75     
 #define reverseSpeed 40
