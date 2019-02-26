@@ -111,7 +111,7 @@ void setup()
   // *** Accelerometer setup ***
   Wire.begin();
   Wire.beginTransmission(MPU);
-  Wire.write(0x6B);            // this is the address of the MPU 6050 module
+  Wire.write(0x6B);           
   Wire.write(0);    
   Wire.endTransmission(true);
 }
