@@ -10,9 +10,15 @@
 #include <SPI.h>
 #include <RH_RF95.h>
 
-#define RFM95_CS 4                     // Pin declarations for the CS, reset and interrupt pin. Pin 14 is Analog pin 0. These can be changed.
-#define RFM95_RST 14
-#define RFM95_INT 2
+// Prototype pin defs
+//#define RFM95_CS 4                     // Pin declarations for the CS, reset and interrupt pin. Pin 14 is Analog pin 0. These can be changed.
+//#define RFM95_RST 14
+//#define RFM95_INT 2
+
+// Final pin defs
+#define RFM95_CS  4
+#define RFM95_RST 2
+#define RFM95_INT 3
 
 #define RF95_FREQ 434.0                // Set frequency to 434.0 MHz which is 1 MHz away from the GPS transciever frequency.
 
